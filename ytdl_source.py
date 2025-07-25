@@ -62,18 +62,18 @@ class YTDLSource:
 
     @classmethod
     async def from_url(cls, url: str, *, loop: Optional[asyncio.AbstractEventLoop] = None, stream: bool = False) -> 'YTDLSource':
-        """Extract audio from YouTube URL using modern extraction."""
+        """Extract audio from YouTube URL using modern extraction with smart fallback."""
         loop = loop or asyncio.get_event_loop()
         
         try:
             logger.info(f"Extracting audio from URL: {url}")
             
-            # Use modern extractor with comprehensive fallbacks
+            # Use modern extractor with smart extraction (tries direct URL, then search)
             modern_extractor = get_modern_extractor()
-            data = await modern_extractor.extract_with_fallback(url)
+            data = await modern_extractor.smart_extract_or_search(url)
             
             if not data:
-                raise Exception("Failed to extract audio data from URL")
+                raise Exception("Failed to extract audio data from URL - try using search terms instead of direct URLs")
             
             audio_url = data.get('url')
             if not audio_url:
@@ -110,13 +110,11 @@ class YTDLSource:
             
         except Exception as e:
             logger.error(f"Error extracting audio from {url}: {e}")
+            # Provide helpful error message for bot detection
+            if any(keyword in str(e).lower() for keyword in ['sign in', 'bot', 'captcha']):
+                logger.error("💡 Tip: YouTube is blocking direct URLs. Try using song names instead (e.g., 'artist - song name')")
             raise
 
-    @classmethod
-    async def search_youtube(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[Dict[str, Any]]:
-        """Search YouTube for a query."""
-        loop = loop or asyncio.get_event_loop()
-        
     @classmethod
     async def search_youtube(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[Dict[str, Any]]:
         """Search YouTube for a query using modern extraction."""

@@ -52,12 +52,18 @@ def check_voice_dependencies() -> bool:
         else:
             logger.warning("⚠️ Opus library not loaded - attempting to load...")
             try:
-                discord.opus.load_opus('opus')
+                # Try loading with the specific shared library path for Render.com
+                discord.opus.load_opus('libopus.so.0')
                 if discord.opus.is_loaded():
-                    logger.info("✅ Opus library loaded after manual load")
+                    logger.info("✅ Opus library loaded after manual load (libopus.so.0)")
                 else:
-                    missing_deps.append("Opus")
-                    logger.error("❌ Failed to load Opus library")
+                    # Fallback to the generic name
+                    discord.opus.load_opus('opus')
+                    if discord.opus.is_loaded():
+                        logger.info("✅ Opus library loaded after manual load (opus)")
+                    else:
+                        missing_deps.append("Opus")
+                        logger.error("❌ Failed to load Opus library with both libopus.so.0 and opus")
             except Exception as e:
                 missing_deps.append("Opus")
                 logger.error(f"❌ Error loading Opus: {e}")

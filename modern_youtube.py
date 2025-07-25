@@ -19,6 +19,14 @@ class ModernYouTubeExtractor:
         self.extraction_cache = {}  # Short-term URL cache
         self.failed_urls = set()   # Track recently failed URLs
         
+        # Add YouTube cookies support for bot detection bypass
+        cookies_path = os.environ.get('COOKIES_PATH')
+        if cookies_path and os.path.exists(cookies_path):
+            self.base_opts['cookiefile'] = cookies_path
+            logger.info(f"✅ Using YouTube cookies from: {cookies_path}")
+        else:
+            logger.info("ℹ️ No cookies file found - using cookieless extraction")
+        
     async def extract_with_fallback(self, url: str, max_retries: int = 3) -> Optional[Dict[str, Any]]:
         """Extract with comprehensive error handling for Render constraints."""
         
@@ -104,12 +112,18 @@ class ModernYouTubeExtractor:
                     
                     # Check for specific error types
                     if any(keyword in error_msg.lower() for keyword in 
-                           ['sign in', 'bot', 'captcha', 'blocked']):
-                        logger.info("Bot detection encountered, trying next strategy...")
+                           ['sign in', 'bot', 'captcha', 'blocked', 'confirm you\'re not a bot']):
+                        logger.warning("🤖 YouTube bot detection encountered - trying next strategy...")
+                        logger.info("💡 Consider using search terms instead of direct URLs, or add cookies via COOKIES_PATH env var")
                         continue
                     elif 'unavailable' in error_msg.lower():
-                        logger.error("Video unavailable, marking as failed")
+                        logger.error("❌ Video unavailable, marking as failed")
                         self.failed_urls.add(url)
+                        return None
+                    elif 'restricted' in error_msg.lower() or 'private' in error_msg.lower():
+                        logger.error("❌ Video is restricted or private")
+                        self.failed_urls.add(url)
+                        return None
                         return None
                     else:
                         # Other errors, continue with next format
@@ -248,6 +262,39 @@ class MultiSourcePlayer:
         
         logger.error(f"All strategies failed for query: {query}")
         return None
+
+    async def smart_extract_or_search(self, url_or_query: str) -> Optional[Dict[str, Any]]:
+        """Smart extraction that tries direct URL first, then falls back to search."""
+        
+        # Check if it's a YouTube URL
+        if 'youtube.com/watch' in url_or_query or 'youtu.be/' in url_or_query:
+            logger.info(f"Attempting direct URL extraction: {url_or_query}")
+            
+            # Try direct extraction first
+            result = await self.extract_with_fallback(url_or_query)
+            if result:
+                return result
+            
+            # If direct extraction fails due to bot detection, try extracting title for search
+            logger.warning("🔄 Direct URL failed, attempting to extract title for search...")
+            try:
+                # Try to get just the title without downloading
+                opts = self.base_opts.copy()
+                opts['skip_download'] = True
+                opts['extract_flat'] = True
+                
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = yt_dlp.YoutubeDL({'quiet': True}).extract_info(url_or_query, download=False)
+                    if info and info.get('title'):
+                        search_query = info['title']
+                        logger.info(f"🔍 Extracted title for search: {search_query}")
+                        return await self.search_youtube(search_query)
+            except Exception as e:
+                logger.debug(f"Title extraction failed: {e}")
+        
+        # Treat as search query
+        logger.info(f"🔍 Treating as search query: {url_or_query}")
+        return await self.search_youtube(url_or_query)
 
 # Global instances
 _modern_extractor = None

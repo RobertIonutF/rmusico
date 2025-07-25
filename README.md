@@ -98,6 +98,52 @@ When playing music, you'll see buttons for:
 - **🔀** - Shuffle queue
 - **🔄/🔂** - Toggle loop mode
 
+## 🤖 YouTube Bot Detection & Solutions
+
+YouTube has implemented stronger bot detection measures that may affect the bot's ability to play music from direct URLs. Here are the solutions implemented:
+
+### Automatic Fallback Strategies
+
+1. **Smart Extraction**: The bot automatically tries direct URL extraction first, then falls back to search if blocked
+2. **Multiple Client Types**: Uses different YouTube client types (web, mobile, TV) to bypass blocks
+3. **Search-First Mode**: When direct URLs fail, the bot extracts the video title and searches for it instead
+
+### Best Practices for Users
+
+- **Use search terms instead of URLs**: Instead of pasting a YouTube URL, try: `/play artist - song name`
+- **Prefer song names**: Example: `/play Rick Astley Never Gonna Give You Up`
+- **Avoid direct URLs when possible**: The bot handles search queries more reliably
+
+### Advanced Solutions (For Deployment)
+
+#### Option 1: YouTube Cookies (Recommended for Production)
+If you have persistent bot detection issues, you can provide YouTube cookies:
+
+1. Export your browser cookies for YouTube:
+   ```bash
+   # Using yt-dlp to extract cookies from Chrome
+   yt-dlp --cookies-from-browser chrome --cookies cookies.txt "https://youtube.com"
+   ```
+
+2. Set the `COOKIES_PATH` environment variable:
+   ```bash
+   export COOKIES_PATH="/path/to/cookies.txt"
+   ```
+
+3. **⚠️ Security Warning**: Never commit cookie files to version control! Add `*.txt` to `.gitignore`
+
+#### Option 2: Alternative Sources
+Consider using other sources when YouTube blocks persist:
+- SoundCloud URLs
+- Direct audio file URLs
+- Self-hosted audio files
+
+### Error Messages Explained
+
+- **"sign in to confirm you're not a bot"**: YouTube is blocking the IP. Try search terms instead of URLs.
+- **"Video unavailable"**: The video is region-blocked, private, or deleted.
+- **"Try using song names instead"**: The bot suggests using search terms rather than direct URLs.
+
 ### Queue Management
 Use `!queue` or `/queue` to see interactive queue controls:
 - **📋 Show Queue** - Display current queue
@@ -119,22 +165,41 @@ Access volume controls with `!volume_panel` or `/volume_panel`:
 
 ## 🚀 Deployment
 
-### Render.com Deployment
-This bot is configured for easy deployment on Render.com:
+### Render.com Deployment (Optimized)
+This bot is specially optimized for Render.com with 2025 improvements:
 
+#### Automatic Optimizations:
+- ✅ **Memory-optimized FFmpeg** for 512MB RAM limits
+- ✅ **Advanced YouTube extraction** with bot detection bypass
+- ✅ **Opus library loading** with `libopus.so.0` fallback
+- ✅ **Environment detection** for hosting platforms
+- ✅ **Smart extraction** (tries URLs, falls back to search)
+
+#### Deployment Steps:
 1. **Fork this repository** to your GitHub account
 2. **Create a Render account** at [render.com](https://render.com)
 3. **Connect your GitHub** and select this repository
 4. **Set environment variables:**
    - `DISCORD_BOT_TOKEN` - Your Discord bot token
+   - `PORT` - Will be set automatically by Render
 5. **Deploy** - Render will automatically install dependencies and start the bot
+
+#### Optional YouTube Cookie Setup (For Bot Detection):
+If YouTube blocks your bot frequently, add cookies:
+1. Export cookies from your browser:
+   ```bash
+   yt-dlp --cookies-from-browser chrome --cookies cookies.txt "https://youtube.com"
+   ```
+2. Upload `cookies.txt` to your repository (⚠️ **Never commit to public repos!**)
+3. Set environment variable: `COOKIES_PATH=/opt/render/project/src/cookies.txt`
 
 ### Features for Hosting:
 - ✅ **Web Dashboard** - View bot status at your deployment URL
 - ✅ **Health Checks** - Automatic monitoring for uptime
 - ✅ **Auto-restart** - Bot restarts if it crashes
-- ✅ **Logs** - Full logging for debugging
-- ✅ **Port Binding** - Proper web service configuration
+- ✅ **Advanced Logging** - Full logging for debugging
+- ✅ **Smart Port Binding** - Proper web service configuration
+- ✅ **Bot Detection Handling** - Multiple fallback strategies
 
 ### Local Development
 ```bash
