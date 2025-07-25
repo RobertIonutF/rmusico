@@ -41,15 +41,31 @@ YTDL_FORMAT_OPTIONS: Dict[str, Any] = {
     # YouTube anti-bot measures workaround
     'extractor_retries': 3,
     'retry_sleep_functions': {'http': lambda n: min(4 ** n, 30)},
-    # Headers to avoid bot detection
-    'http_headers': {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.124 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
-        'Accept-Language': 'en-us,en;q=0.5',
-        'Accept-Encoding': 'gzip,deflate',
-        'Accept-Charset': 'ISO-8859-1,utf-8;q=0.7,*;q=0.7',
-        'Connection': 'keep-alive',
+    # Use mobile web client which is less likely to trigger bot detection
+    'extractor_args': {
+        'youtube': {
+            'player_client': ['mweb', 'tv', 'web'],
+            'player_skip': ['webpage'],
+            'skip': ['hls', 'dash'],
+        }
     },
+    # Better headers to avoid bot detection
+    'http_headers': {
+        'User-Agent': 'Mozilla/5.0 (Linux; Android 11; SM-G973F) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/91.0.4472.120 Mobile Safari/537.36',
+        'Accept': 'text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8',
+        'Accept-Language': 'en-US,en;q=0.9',
+        'Accept-Encoding': 'gzip, deflate',
+        'DNT': '1',
+        'Connection': 'keep-alive',
+        'Upgrade-Insecure-Requests': '1',
+        'Sec-Fetch-Dest': 'document',
+        'Sec-Fetch-Mode': 'navigate',
+        'Sec-Fetch-Site': 'none',
+        'Sec-Fetch-User': '?1',
+    },
+    # Rate limiting to avoid triggering detection
+    'sleep_interval': 1,
+    'max_sleep_interval': 3,
     # Remove extractaudio and audioformat - let FFmpeg handle conversion
 }
 

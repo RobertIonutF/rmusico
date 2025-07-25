@@ -150,16 +150,26 @@ python app.py
 
 ### YouTube Issues
 If you see "YouTube Access Restricted" errors:
-- **Wait a few minutes** - YouTube may lift the restriction
-- **Use song names** instead of direct URLs
+- **Automatic retry** - Bot uses multiple extraction strategies automatically
+- **Wait a few minutes** - YouTube may lift temporary restrictions
+- **Use song names** instead of direct URLs when possible
 - **Try different search terms** for better results
+
+### Bot Detection Protection
+The bot includes advanced protection against YouTube bot detection:
+- ✅ **Multiple client strategies** (mobile, TV, Android, web)
+- ✅ **Smart retry logic** with different user agents
+- ✅ **Rate limiting** to avoid triggering detection
+- ✅ **Fallback extractors** when main methods fail
+- ✅ **Mobile-first approach** (less likely to be blocked)
 
 ### Common Solutions
 - 🎤 Join a voice channel before using music commands
-- 🔊 Ensure bot has voice channel permissions
+- 🔊 Ensure bot has voice channel permissions  
 - 📱 Use interactive buttons for easier control
 - 🔄 Try `/skip` if a song gets stuck
 - 🎛️ Use `/controls` for the full control panel
+- 🔍 Use song titles instead of YouTube URLs
 
 ## Project Structure
 

@@ -7,7 +7,7 @@ import logging
 from typing import Optional, Dict, Any, ClassVar
 
 from config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS, FFMPEG_OPUS_OPTIONS, DEFAULT_VOLUME, MAX_SEARCH_RESULTS
-from alternative_extractor import fallback_extract
+from smart_youtube import get_smart_extractor
 
 logger = logging.getLogger(__name__)
 
@@ -51,20 +51,15 @@ class YTDLSource:
 
     @classmethod
     async def from_url(cls, url: str, *, loop: Optional[asyncio.AbstractEventLoop] = None, stream: bool = False) -> 'YTDLSource':
-        """Extract audio from YouTube URL."""
+        """Extract audio from YouTube URL using smart extraction."""
         loop = loop or asyncio.get_event_loop()
         
         try:
             logger.info(f"Extracting audio from URL: {url}")
-            data = await loop.run_in_executor(
-                None, 
-                lambda: cls.ytdl.extract_info(url, download=not stream)
-            )
             
-            if 'entries' in data:
-                # Handle playlists - take first video
-                data = data['entries'][0]
-                logger.info(f"Playlist detected, using first video: {data.get('title', 'Unknown')}")
+            # Use smart extractor instead of direct yt-dlp
+            smart_extractor = get_smart_extractor()
+            data = await smart_extractor.extract_info(url, loop=loop)
             
             filename = data['url'] if stream else cls.ytdl.prepare_filename(data)
             
@@ -86,25 +81,7 @@ class YTDLSource:
             
         except Exception as e:
             logger.error(f"Error extracting audio from {url}: {e}")
-            
-            # Try alternative extraction if main method fails
-            if "Sign in to confirm you're not a bot" in str(e) or "bot" in str(e).lower():
-                logger.info("Bot detection encountered, trying alternative extraction...")
-                try:
-                    fallback_data = await fallback_extract(url)
-                    if fallback_data:
-                        # Create a dummy audio source for fallback
-                        # This is a placeholder - in production you'd need a different approach
-                        logger.warning("⚠️ Using fallback extraction - limited functionality")
-                        # For now, still raise the original error as we need proper audio stream
-                        raise Exception("YouTube bot detection - bot cannot play audio without proper authentication")
-                    else:
-                        raise e
-                except Exception as fallback_error:
-                    logger.error(f"Fallback extraction also failed: {fallback_error}")
-                    raise e
-            else:
-                raise
+            raise
 
     @classmethod
     async def search_youtube(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[Dict[str, Any]]:
@@ -113,15 +90,12 @@ class YTDLSource:
         
         try:
             logger.info(f"Searching YouTube for: {query}")
-            # Search for videos
-            search_query = f"ytsearch:{query}"
-            data = await loop.run_in_executor(
-                None, 
-                lambda: cls.ytdl.extract_info(search_query, download=False)
-            )
             
-            if 'entries' in data and len(data['entries']) > 0:
-                result = data['entries'][0]
+            # Use smart extractor for searches
+            smart_extractor = get_smart_extractor()
+            result = await smart_extractor.search_youtube(query, loop=loop)
+            
+            if result:
                 logger.info(f"Found video: {result.get('title', 'Unknown')}")
                 return result
             
@@ -134,15 +108,20 @@ class YTDLSource:
 
     @classmethod
     async def search_youtube_multiple(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> list:
-        """Search YouTube for multiple results."""
+        """Search YouTube for multiple results using smart extraction."""
         loop = loop or asyncio.get_event_loop()
         
         try:
             logger.info(f"Searching YouTube for multiple results: {query}")
+            
+            # Use the smart extractor's first strategy for multi-search
+            smart_extractor = get_smart_extractor()
+            strategy_name, extractor = smart_extractor.extractors[0]
+            
             search_query = f"ytsearch{MAX_SEARCH_RESULTS}:{query}"
             data = await loop.run_in_executor(
                 None, 
-                lambda: cls.ytdl.extract_info(search_query, download=False)
+                lambda: extractor.extract_info(search_query, download=False)
             )
             
             if 'entries' in data:
