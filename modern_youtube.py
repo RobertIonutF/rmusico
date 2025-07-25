@@ -138,15 +138,42 @@ class ModernYouTubeExtractor:
         # All strategies failed
         logger.error(f"All extraction strategies failed for: {url}")
         self.failed_urls.add(url)
+        
+        # If this was a URL extraction that failed due to bot detection, try search fallback
+        if 'youtube.com/watch' in url or 'youtu.be/' in url:
+            logger.warning("🔄 URL extraction failed completely, attempting search fallback...")
+            try:
+                # Try to extract title for search as last resort
+                opts = self.base_opts.copy()
+                opts['extract_flat'] = True
+                opts['skip_download'] = True
+                # Use minimal options to avoid bot detection
+                opts.pop('extractor_args', None)
+                
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = ydl.extract_info(url, download=False)
+                    if info and info.get('title'):
+                        search_query = info['title']
+                        logger.info(f"🔍 Extracted title for search fallback: {search_query}")
+                        search_result = await self.search_youtube(search_query)
+                        if search_result:
+                            logger.info("✅ Search fallback successful!")
+                            return search_result
+            except Exception as e:
+                logger.debug(f"Search fallback also failed: {e}")
+        
         return None
     
     def _get_client_order(self, attempt: int) -> List[str]:
-        """Get client order based on attempt number."""
+        """Get client order based on attempt number with 2025 bot detection optimizations."""
+        # Enhanced client strategies for 2025 YouTube bot detection
         client_strategies = [
-            ['mweb', 'ios', 'android_music'],      # Mobile-first
-            ['ios', 'mweb', 'tv'],                 # iOS-first
-            ['android_music', 'mweb', 'tv'],       # Android Music-first  
-            ['tv', 'mweb', 'ios'],                 # TV-first
+            ['mweb', 'ios'],                       # Mobile web + iOS (best for bot detection)
+            ['ios', 'android_music'],              # iOS + Android Music
+            ['android_music', 'mweb'],             # Android Music + Mobile web
+            ['mweb'],                              # Mobile web only (most reliable)
+            ['tv_embedded', 'mweb'],               # TV embedded + mobile fallback
+            ['web_safari', 'ios'],                 # Safari + iOS combination
         ]
         return client_strategies[attempt % len(client_strategies)]
     
@@ -229,27 +256,57 @@ class ModernYouTubeExtractor:
         if 'youtube.com/watch' in url_or_query or 'youtu.be/' in url_or_query:
             logger.info(f"Attempting direct URL extraction: {url_or_query}")
             
-            # Try direct extraction first
-            result = await self.extract_with_fallback(url_or_query)
+            # Try direct extraction first but with reduced retries for faster fallback
+            result = await self.extract_with_fallback(url_or_query, max_retries=2)
             if result:
                 return result
             
-            # If direct extraction fails due to bot detection, try extracting title for search
-            logger.warning("🔄 Direct URL failed, attempting to extract title for search...")
-            try:
-                # Try to get just the title without downloading
-                opts = self.base_opts.copy()
-                opts['skip_download'] = True
-                opts['extract_flat'] = True
+            # If direct extraction failed, immediately try search fallback
+            logger.warning("🔄 Direct URL failed, attempting search fallback immediately...")
+            
+            # Extract video ID for title-based search
+            video_id = None
+            if 'youtube.com/watch?v=' in url_or_query:
+                video_id = url_or_query.split('v=')[1].split('&')[0]
+            elif 'youtu.be/' in url_or_query:
+                video_id = url_or_query.split('youtu.be/')[1].split('?')[0]
+            
+            if video_id:
+                # Try searching by video ID first (often works better)
+                search_queries = [
+                    video_id,  # Sometimes direct video ID search works
+                    f"site:youtube.com {video_id}",  # Site-specific search
+                ]
                 
+                for search_query in search_queries:
+                    try:
+                        logger.info(f"🔍 Trying search: {search_query}")
+                        result = await self.search_youtube(search_query)
+                        if result:
+                            logger.info("✅ Search fallback successful!")
+                            return result
+                    except Exception as e:
+                        logger.debug(f"Search query failed: {search_query} - {e}")
+            
+            # If video ID search fails, try extracting title with minimal options
+            try:
+                opts = {'quiet': True, 'extract_flat': True, 'skip_download': True}
                 with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = yt_dlp.YoutubeDL({'quiet': True}).extract_info(url_or_query, download=False)
+                    info = ydl.extract_info(url_or_query, download=False)
                     if info and info.get('title'):
                         search_query = info['title']
                         logger.info(f"🔍 Extracted title for search: {search_query}")
-                        return await self.search_youtube(search_query)
+                        result = await self.search_youtube(search_query)
+                        if result:
+                            logger.info("✅ Title-based search successful!")
+                            return result
             except Exception as e:
                 logger.debug(f"Title extraction failed: {e}")
+            
+            # Last resort: suggest the user try a different approach
+            logger.error("❌ All extraction methods failed")
+            logger.error("💡 Try using the song/video title instead of the URL")
+            return None
         
         # Treat as search query
         logger.info(f"🔍 Treating as search query: {url_or_query}")
