@@ -222,6 +222,39 @@ class ModernYouTubeExtractor:
         if len(self.failed_urls) > 100:
             self.failed_urls.clear()
 
+    async def smart_extract_or_search(self, url_or_query: str) -> Optional[Dict[str, Any]]:
+        """Smart extraction that tries direct URL first, then falls back to search."""
+        
+        # Check if it's a YouTube URL
+        if 'youtube.com/watch' in url_or_query or 'youtu.be/' in url_or_query:
+            logger.info(f"Attempting direct URL extraction: {url_or_query}")
+            
+            # Try direct extraction first
+            result = await self.extract_with_fallback(url_or_query)
+            if result:
+                return result
+            
+            # If direct extraction fails due to bot detection, try extracting title for search
+            logger.warning("🔄 Direct URL failed, attempting to extract title for search...")
+            try:
+                # Try to get just the title without downloading
+                opts = self.base_opts.copy()
+                opts['skip_download'] = True
+                opts['extract_flat'] = True
+                
+                with yt_dlp.YoutubeDL(opts) as ydl:
+                    info = yt_dlp.YoutubeDL({'quiet': True}).extract_info(url_or_query, download=False)
+                    if info and info.get('title'):
+                        search_query = info['title']
+                        logger.info(f"🔍 Extracted title for search: {search_query}")
+                        return await self.search_youtube(search_query)
+            except Exception as e:
+                logger.debug(f"Title extraction failed: {e}")
+        
+        # Treat as search query
+        logger.info(f"🔍 Treating as search query: {url_or_query}")
+        return await self.search_youtube(url_or_query)
+
 class MultiSourcePlayer:
     """Multi-source fallback player for when YouTube fails."""
     
@@ -262,39 +295,6 @@ class MultiSourcePlayer:
         
         logger.error(f"All strategies failed for query: {query}")
         return None
-
-    async def smart_extract_or_search(self, url_or_query: str) -> Optional[Dict[str, Any]]:
-        """Smart extraction that tries direct URL first, then falls back to search."""
-        
-        # Check if it's a YouTube URL
-        if 'youtube.com/watch' in url_or_query or 'youtu.be/' in url_or_query:
-            logger.info(f"Attempting direct URL extraction: {url_or_query}")
-            
-            # Try direct extraction first
-            result = await self.extract_with_fallback(url_or_query)
-            if result:
-                return result
-            
-            # If direct extraction fails due to bot detection, try extracting title for search
-            logger.warning("🔄 Direct URL failed, attempting to extract title for search...")
-            try:
-                # Try to get just the title without downloading
-                opts = self.base_opts.copy()
-                opts['skip_download'] = True
-                opts['extract_flat'] = True
-                
-                with yt_dlp.YoutubeDL(opts) as ydl:
-                    info = yt_dlp.YoutubeDL({'quiet': True}).extract_info(url_or_query, download=False)
-                    if info and info.get('title'):
-                        search_query = info['title']
-                        logger.info(f"🔍 Extracted title for search: {search_query}")
-                        return await self.search_youtube(search_query)
-            except Exception as e:
-                logger.debug(f"Title extraction failed: {e}")
-        
-        # Treat as search query
-        logger.info(f"🔍 Treating as search query: {url_or_query}")
-        return await self.search_youtube(url_or_query)
 
 # Global instances
 _modern_extractor = None
