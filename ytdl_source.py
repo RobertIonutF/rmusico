@@ -4,12 +4,23 @@ import asyncio
 import discord
 import yt_dlp
 import logging
+import os
 from typing import Optional, Dict, Any, ClassVar
 
-from config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS, FFMPEG_OPUS_OPTIONS, DEFAULT_VOLUME, MAX_SEARCH_RESULTS
-from smart_youtube import get_smart_extractor
+from config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS, FFMPEG_OPUS_OPTIONS, RENDER_FFMPEG_OPTIONS, DEFAULT_VOLUME, MAX_SEARCH_RESULTS
+from modern_youtube import get_modern_extractor, get_multi_source_player
 
 logger = logging.getLogger(__name__)
+
+def get_ffmpeg_options() -> Dict[str, str]:
+    """Get appropriate FFmpeg options based on environment."""
+    # Detect if running on Render.com or similar constrained environment
+    if os.environ.get('RENDER') or os.environ.get('PORT'):
+        logger.info("Detected hosting environment, using optimized FFmpeg settings")
+        return RENDER_FFMPEG_OPTIONS
+    else:
+        logger.info("Using standard FFmpeg settings")
+        return FFMPEG_OPTIONS
 
 
 class YTDLSource:
@@ -51,31 +62,49 @@ class YTDLSource:
 
     @classmethod
     async def from_url(cls, url: str, *, loop: Optional[asyncio.AbstractEventLoop] = None, stream: bool = False) -> 'YTDLSource':
-        """Extract audio from YouTube URL using smart extraction."""
+        """Extract audio from YouTube URL using modern extraction."""
         loop = loop or asyncio.get_event_loop()
         
         try:
             logger.info(f"Extracting audio from URL: {url}")
             
-            # Use smart extractor instead of direct yt-dlp
-            smart_extractor = get_smart_extractor()
-            data = await smart_extractor.extract_info(url, loop=loop)
+            # Use modern extractor with comprehensive fallbacks
+            modern_extractor = get_modern_extractor()
+            data = await modern_extractor.extract_with_fallback(url)
             
-            filename = data['url'] if stream else cls.ytdl.prepare_filename(data)
+            if not data:
+                raise Exception("Failed to extract audio data from URL")
             
-            # Use PCM audio for better compatibility with volume control
-            # PCM allows volume transformation while Opus does not
+            audio_url = data.get('url')
+            if not audio_url:
+                raise Exception("No audio URL found in extracted data")
+            
+            # Get appropriate FFmpeg options for environment
+            ffmpeg_opts = get_ffmpeg_options()
+            
+            # Try creating audio source with environment-appropriate settings
             try:
-                source = discord.FFmpegPCMAudio(filename, **FFMPEG_OPTIONS)
-                logger.info(f"Successfully created PCM audio source for: {data.get('title', 'Unknown')}")
-            except Exception as pcm_error:
-                logger.warning(f"PCM audio failed, trying Opus: {pcm_error}")
+                # Try Opus first for better compression on constrained environments
+                if os.environ.get('RENDER') or os.environ.get('PORT'):
+                    source = discord.FFmpegOpusAudio(audio_url, **ffmpeg_opts)
+                    logger.info(f"Created Opus audio source for hosting environment: {data.get('title', 'Unknown')}")
+                else:
+                    source = discord.FFmpegPCMAudio(audio_url, **ffmpeg_opts)
+                    logger.info(f"Created PCM audio source: {data.get('title', 'Unknown')}")
+                    
+            except Exception as primary_error:
+                logger.warning(f"Primary audio source failed: {primary_error}")
                 try:
-                    source = discord.FFmpegOpusAudio(filename, **FFMPEG_OPUS_OPTIONS)
-                    logger.info(f"Successfully created Opus audio source (no volume control): {data.get('title', 'Unknown')}")
-                except Exception as opus_error:
-                    logger.error(f"Both PCM and Opus failed: PCM={pcm_error}, Opus={opus_error}")
-                    raise opus_error
+                    # Fallback to the other format
+                    if os.environ.get('RENDER') or os.environ.get('PORT'):
+                        source = discord.FFmpegPCMAudio(audio_url, **FFMPEG_OPTIONS)
+                        logger.info(f"Fallback to PCM audio source: {data.get('title', 'Unknown')}")
+                    else:
+                        source = discord.FFmpegOpusAudio(audio_url, **FFMPEG_OPUS_OPTIONS)
+                        logger.info(f"Fallback to Opus audio source: {data.get('title', 'Unknown')}")
+                except Exception as fallback_error:
+                    logger.error(f"Both audio sources failed: Primary={primary_error}, Fallback={fallback_error}")
+                    raise fallback_error
             
             return cls(source, data=data)
             
@@ -88,12 +117,17 @@ class YTDLSource:
         """Search YouTube for a query."""
         loop = loop or asyncio.get_event_loop()
         
+    @classmethod
+    async def search_youtube(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[Dict[str, Any]]:
+        """Search YouTube for a query using modern extraction."""
+        loop = loop or asyncio.get_event_loop()
+        
         try:
             logger.info(f"Searching YouTube for: {query}")
             
-            # Use smart extractor for searches
-            smart_extractor = get_smart_extractor()
-            result = await smart_extractor.search_youtube(query, loop=loop)
+            # Use modern extractor for searches
+            modern_extractor = get_modern_extractor()
+            result = await modern_extractor.search_youtube(query)
             
             if result:
                 logger.info(f"Found video: {result.get('title', 'Unknown')}")
@@ -108,21 +142,25 @@ class YTDLSource:
 
     @classmethod
     async def search_youtube_multiple(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> list:
-        """Search YouTube for multiple results using smart extraction."""
+        """Search YouTube for multiple results using modern extraction."""
         loop = loop or asyncio.get_event_loop()
         
         try:
             logger.info(f"Searching YouTube for multiple results: {query}")
             
-            # Use the smart extractor's first strategy for multi-search
-            smart_extractor = get_smart_extractor()
-            strategy_name, extractor = smart_extractor.extractors[0]
+            # Use the modern extractor for multi-search
+            modern_extractor = get_modern_extractor()
             
+            # Create a search-specific extraction
             search_query = f"ytsearch{MAX_SEARCH_RESULTS}:{query}"
-            data = await loop.run_in_executor(
-                None, 
-                lambda: extractor.extract_info(search_query, download=False)
-            )
+            opts = modern_extractor.base_opts.copy()
+            opts['format'] = 'bestaudio[ext=webm]/bestaudio'
+            
+            with yt_dlp.YoutubeDL(opts) as ydl:
+                data = await loop.run_in_executor(
+                    None, 
+                    lambda: ydl.extract_info(search_query, download=False)
+                )
             
             if 'entries' in data:
                 logger.info(f"Found {len(data['entries'])} results")
