@@ -32,15 +32,21 @@ cd rmusico
 
 2. Install Python dependencies:
 ```bash
-pip install discord.py yt-dlp
+pip install -r requirements.txt
 ```
 
-3. Install FFmpeg:
+3. Install system dependencies for voice support (Linux):
+```bash
+sudo apt install libopus0 ffmpeg
+```
+If deploying on Render, create an `apt.txt` file with `libopus0` so it gets installed automatically.
+
+4. Install FFmpeg (if not installed):
    - **Windows**: Download from [FFmpeg.org](https://ffmpeg.org/download.html) and add to PATH
    - **Linux**: `sudo apt install ffmpeg`
    - **macOS**: `brew install ffmpeg`
 
-4. Set up your bot token:
+5. Set up your bot token:
    - Create a Discord application at [Discord Developer Portal](https://discord.com/developers/applications)
    - Create a bot and copy the token
    - Copy `.env.example` to `.env`: `copy .env.example .env` (Windows) or `cp .env.example .env` (Linux/macOS)
