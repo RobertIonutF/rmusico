@@ -111,6 +111,56 @@ Access volume controls with `!volume_panel` or `/volume_panel`:
 - ✅ Prevents accidental commands
 - ✅ Works for anyone in the voice channel
 
+## 🚀 Deployment
+
+### Render.com Deployment
+This bot is configured for easy deployment on Render.com:
+
+1. **Fork this repository** to your GitHub account
+2. **Create a Render account** at [render.com](https://render.com)
+3. **Connect your GitHub** and select this repository
+4. **Set environment variables:**
+   - `DISCORD_BOT_TOKEN` - Your Discord bot token
+5. **Deploy** - Render will automatically install dependencies and start the bot
+
+### Features for Hosting:
+- ✅ **Web Dashboard** - View bot status at your deployment URL
+- ✅ **Health Checks** - Automatic monitoring for uptime
+- ✅ **Auto-restart** - Bot restarts if it crashes
+- ✅ **Logs** - Full logging for debugging
+- ✅ **Port Binding** - Proper web service configuration
+
+### Local Development
+```bash
+# Clone the repository
+git clone <your-fork-url>
+cd rmusico
+
+# Install dependencies
+pip install -r requirements.txt
+
+# Create .env file with your bot token
+echo "DISCORD_BOT_TOKEN=your_token_here" > .env
+
+# Run the bot
+python app.py
+```
+
+## 🔧 Troubleshooting
+
+### YouTube Issues
+If you see "YouTube Access Restricted" errors:
+- **Wait a few minutes** - YouTube may lift the restriction
+- **Use song names** instead of direct URLs
+- **Try different search terms** for better results
+
+### Common Solutions
+- 🎤 Join a voice channel before using music commands
+- 🔊 Ensure bot has voice channel permissions
+- 📱 Use interactive buttons for easier control
+- 🔄 Try `/skip` if a song gets stuck
+- 🎛️ Use `/controls` for the full control panel
+
 ## Project Structure
 
 ```

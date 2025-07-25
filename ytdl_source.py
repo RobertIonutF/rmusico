@@ -7,6 +7,7 @@ import logging
 from typing import Optional, Dict, Any, ClassVar
 
 from config import YTDL_FORMAT_OPTIONS, FFMPEG_OPTIONS, FFMPEG_OPUS_OPTIONS, DEFAULT_VOLUME, MAX_SEARCH_RESULTS
+from alternative_extractor import fallback_extract
 
 logger = logging.getLogger(__name__)
 
@@ -85,7 +86,25 @@ class YTDLSource:
             
         except Exception as e:
             logger.error(f"Error extracting audio from {url}: {e}")
-            raise
+            
+            # Try alternative extraction if main method fails
+            if "Sign in to confirm you're not a bot" in str(e) or "bot" in str(e).lower():
+                logger.info("Bot detection encountered, trying alternative extraction...")
+                try:
+                    fallback_data = await fallback_extract(url)
+                    if fallback_data:
+                        # Create a dummy audio source for fallback
+                        # This is a placeholder - in production you'd need a different approach
+                        logger.warning("⚠️ Using fallback extraction - limited functionality")
+                        # For now, still raise the original error as we need proper audio stream
+                        raise Exception("YouTube bot detection - bot cannot play audio without proper authentication")
+                    else:
+                        raise e
+                except Exception as fallback_error:
+                    logger.error(f"Fallback extraction also failed: {fallback_error}")
+                    raise e
+            else:
+                raise
 
     @classmethod
     async def search_youtube(cls, query: str, *, loop: Optional[asyncio.AbstractEventLoop] = None) -> Optional[Dict[str, Any]]:

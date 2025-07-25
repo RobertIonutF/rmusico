@@ -15,6 +15,15 @@ from utils import create_song_embed
 from ffmpeg_utils import setup_ffmpeg
 from music_controls import create_music_controls
 
+# Import web server functions
+try:
+    from web_server import update_bot_status
+    web_server_available = True
+except ImportError:
+    web_server_available = False
+    def update_bot_status(**kwargs):
+        pass  # No-op if web server not available
+
 # Configure logging
 logging.basicConfig(
     level=logging.INFO,
@@ -104,6 +113,19 @@ class MusicBot(commands.Bot):
             logger.info(f"Created new music queue for guild {guild_id}")
         return self.music_queues[guild_id]
     
+    def update_web_status(self, current_song: str = None) -> None:
+        """Update web server status."""
+        try:
+            update_bot_status(
+                connected=self.is_ready(),
+                guilds=len(self.guilds),
+                voice_connected=any(guild.voice_client and guild.voice_client.is_connected() for guild in self.guilds),
+                queue_size=sum(len(queue) for queue in self.music_queues.values()),
+                current_song=current_song
+            )
+        except Exception as e:
+            logger.debug(f"Failed to update web status: {e}")
+    
     async def play_next(self, ctx: commands.Context) -> None:
         """Play the next song in queue."""
         queue = self.get_queue(ctx.guild.id)
@@ -126,8 +148,12 @@ class MusicBot(commands.Bot):
             view = create_music_controls(self, ctx.guild.id)
             message = await ctx.send(embed=embed, view=view)
             view.message = message
+            
+            # Update web status
+            self.update_web_status(current_song=player.title)
         else:
             logger.info(f"No more songs in queue for guild {ctx.guild.id}")
+            self.update_web_status()
     
     async def play_next_interaction(self, interaction: discord.Interaction) -> None:
         """Play the next song in queue (for slash commands)."""
@@ -166,8 +192,12 @@ class MusicBot(commands.Bot):
                 # Interaction may have expired, send to channel directly
                 message = await interaction.channel.send(embed=embed, view=view)
                 view.message = message
+                
+            # Update web status
+            self.update_web_status(current_song=player.title)
         else:
             logger.info(f"No more songs in queue for guild {interaction.guild.id}")
+            self.update_web_status()
     
     async def _play_next_from_interaction(self, guild_id: int, channel) -> None:
         """Helper method to continue playing songs after interaction-initiated playback."""
@@ -200,6 +230,14 @@ class MusicBot(commands.Bot):
         """Bot ready event."""
         logger.info(f'{self.user} has connected to Discord!')
         logger.info(f'Bot is in {len(self.guilds)} guilds')
+        
+        # Update web server status
+        update_bot_status(
+            connected=True,
+            guilds=len(self.guilds),
+            voice_connected=any(guild.voice_client for guild in self.guilds),
+            queue_size=sum(len(queue) for queue in self.music_queues.values())
+        )
         
         # Set bot status
         activity = discord.Activity(type=discord.ActivityType.listening, name=f"{BOT_PREFIX}help | /help")

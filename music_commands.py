@@ -9,6 +9,7 @@ from typing import TYPE_CHECKING
 from ytdl_source import YTDLSource
 from utils import create_embed, create_song_embed, create_queue_embed, create_search_results_embed
 from music_controls import create_music_controls, create_queue_controls, create_volume_controls
+from youtube_helper import create_youtube_blocked_embed, get_troubleshooting_tips
 
 if TYPE_CHECKING:
     from music_bot import MusicBot
@@ -91,7 +92,13 @@ class MusicCommands(commands.Cog):
                     
             except Exception as e:
                 logger.error(f"Error playing music: {e}")
-                await ctx.send(f"❌ Error playing music: {str(e)}")
+                
+                # Check if it's a YouTube bot detection error
+                if "Sign in to confirm you're not a bot" in str(e) or "bot" in str(e).lower():
+                    embed = create_youtube_blocked_embed()
+                    await ctx.send(embed=embed)
+                else:
+                    await ctx.send(f"❌ Error playing music: {str(e)}")
 
     @commands.command(name='pause')
     async def pause_music(self, ctx: commands.Context) -> None:

@@ -17,6 +17,7 @@ from config import BOT_PREFIX
 from ytdl_source import YTDLSource
 from utils import create_embed, create_song_embed, create_queue_embed, create_search_results_embed
 from music_controls import create_music_controls, create_queue_controls, create_volume_controls
+from youtube_helper import create_youtube_blocked_embed, get_troubleshooting_tips
 
 logger = logging.getLogger(__name__)
 
@@ -110,7 +111,13 @@ class MusicSlashCommands(commands.Cog):
                 
         except Exception as e:
             logger.error(f"Error playing music: {e}")
-            await interaction.followup.send(f"❌ Error playing music: {str(e)}")
+            
+            # Check if it's a YouTube bot detection error
+            if "Sign in to confirm you're not a bot" in str(e) or "bot" in str(e).lower():
+                embed = create_youtube_blocked_embed()
+                await interaction.followup.send(embed=embed)
+            else:
+                await interaction.followup.send(f"❌ Error playing music: {str(e)}")
 
     @app_commands.command(name="pause", description="Pause the current song")
     async def slash_pause(self, interaction: discord.Interaction) -> None:

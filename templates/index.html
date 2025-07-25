@@ -1,0 +1,188 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RMusico Discord Bot - Dashboard</title>
+    <style>
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            margin: 0;
+            padding: 20px;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            min-height: 100vh;
+        }
+        .container {
+            max-width: 800px;
+            margin: 0 auto;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 30px;
+            border-radius: 15px;
+            backdrop-filter: blur(10px);
+            box-shadow: 0 8px 32px rgba(31, 38, 135, 0.37);
+        }
+        h1 {
+            text-align: center;
+            margin-bottom: 30px;
+            font-size: 2.5em;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.3);
+        }
+        .status-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            margin-bottom: 30px;
+        }
+        .status-card {
+            background: rgba(255, 255, 255, 0.2);
+            padding: 20px;
+            border-radius: 10px;
+            text-align: center;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+        }
+        .status-card h3 {
+            margin: 0 0 10px 0;
+            font-size: 1.2em;
+        }
+        .status-value {
+            font-size: 1.5em;
+            font-weight: bold;
+            margin: 10px 0;
+        }
+        .status-online {
+            color: #4CAF50;
+        }
+        .status-offline {
+            color: #f44336;
+        }
+        .info-section {
+            background: rgba(255, 255, 255, 0.1);
+            padding: 20px;
+            border-radius: 10px;
+            margin-top: 20px;
+        }
+        .feature-list {
+            list-style: none;
+            padding: 0;
+        }
+        .feature-list li {
+            padding: 8px 0;
+            border-bottom: 1px solid rgba(255, 255, 255, 0.2);
+        }
+        .feature-list li:last-child {
+            border-bottom: none;
+        }
+        .emoji {
+            margin-right: 10px;
+        }
+        .refresh-btn {
+            background: rgba(255, 255, 255, 0.2);
+            color: white;
+            border: 1px solid rgba(255, 255, 255, 0.3);
+            padding: 10px 20px;
+            border-radius: 5px;
+            cursor: pointer;
+            margin: 10px 5px;
+            font-size: 16px;
+        }
+        .refresh-btn:hover {
+            background: rgba(255, 255, 255, 0.3);
+        }
+        .footer {
+            text-align: center;
+            margin-top: 40px;
+            opacity: 0.7;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <h1>🎵 RMusico Discord Bot</h1>
+        
+        <div class="status-grid">
+            <div class="status-card">
+                <h3>Bot Status</h3>
+                <div class="status-value {{ 'status-online' if status.connected else 'status-offline' }}">
+                    {{ '🟢 Online' if status.connected else '🔴 Offline' }}
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Servers</h3>
+                <div class="status-value">
+                    🏠 {{ status.guilds }}
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Voice Status</h3>
+                <div class="status-value {{ 'status-online' if status.voice_connected else 'status-offline' }}">
+                    {{ '🎤 Connected' if status.voice_connected else '🔇 Disconnected' }}
+                </div>
+            </div>
+            
+            <div class="status-card">
+                <h3>Queue Size</h3>
+                <div class="status-value">
+                    📋 {{ status.queue_size }}
+                </div>
+            </div>
+        </div>
+
+        {% if status.current_song %}
+        <div class="info-section">
+            <h3>🎵 Currently Playing</h3>
+            <p><strong>{{ status.current_song }}</strong></p>
+        </div>
+        {% endif %}
+
+        <div class="info-section">
+            <h3>🎮 Features</h3>
+            <ul class="feature-list">
+                <li><span class="emoji">🎵</span>Play music from YouTube</li>
+                <li><span class="emoji">🎛️</span>Interactive button controls</li>
+                <li><span class="emoji">📋</span>Queue management</li>
+                <li><span class="emoji">🔀</span>Shuffle and loop modes</li>
+                <li><span class="emoji">🔊</span>Volume controls</li>
+                <li><span class="emoji">⚡</span>Slash commands support</li>
+                <li><span class="emoji">📱</span>Mobile-friendly interface</li>
+            </ul>
+        </div>
+
+        <div class="info-section">
+            <h3>🚀 Quick Commands</h3>
+            <ul class="feature-list">
+                <li><span class="emoji">▶️</span><code>/play &lt;song&gt;</code> - Play a song</li>
+                <li><span class="emoji">📋</span><code>/queue</code> - Show current queue</li>
+                <li><span class="emoji">🎛️</span><code>/controls</code> - Show music controls</li>
+                <li><span class="emoji">🔊</span><code>/volume_panel</code> - Volume controls</li>
+                <li><span class="emoji">❓</span><code>/help</code> - Show all commands</li>
+            </ul>
+        </div>
+
+        <div style="text-align: center; margin-top: 30px;">
+            <button class="refresh-btn" onclick="location.reload()">🔄 Refresh Status</button>
+            <button class="refresh-btn" onclick="window.open('/api/status', '_blank')">📊 API Status</button>
+        </div>
+
+        <div class="footer">
+            <p>🎵 RMusico - Your Discord Music Companion</p>
+            <p>Powered by Discord.py • yt-dlp • FFmpeg</p>
+        </div>
+    </div>
+
+    <script>
+        // Auto-refresh status every 30 seconds
+        setInterval(() => {
+            fetch('/api/status')
+                .then(response => response.json())
+                .then(data => {
+                    console.log('Status updated:', data);
+                    // You could update the UI here without full page reload
+                })
+                .catch(error => console.error('Error fetching status:', error));
+        }, 30000);
+    </script>
+</body>
+</html>
